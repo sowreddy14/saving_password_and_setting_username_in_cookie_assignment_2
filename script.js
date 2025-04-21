@@ -4,63 +4,60 @@ const pinInput = document.getElementById('pin');
 const sha256HashView = document.getElementById('sha256-hash');
 const resultView = document.getElementById('result');
 
-// a function to store in the local storage
+// store value in local storage
 function store(key, value) {
   localStorage.setItem(key, value);
 }
 
-// a function to retrieve from the local storage
+// retrieve value from local storage
 function retrieve(key) {
   return localStorage.getItem(key);
 }
 
-function getRandomArbitrary(min, max) {
-  let cached;
-  cached = Math.random() * (max - min) + min;
-  cached = Math.floor(cached);
-  return cached;
-}
-
-// a function to clear the local storage
+// clear local storage
 function clear() {
   localStorage.clear();
 }
 
-// a function to generate sha256 hash of the given string
+// get a random 3-digit number
+function getRandomArbitrary(min, max) {
+  const random = Math.floor(Math.random() * (max - min + 1)) + min;
+  return random;
+}
+
+// generate SHA256 hash of a given string
 async function sha256(message) {
-  // encode as UTF-8
   const msgBuffer = new TextEncoder().encode(message);
-
-  // hash the message
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-
-  // convert ArrayBuffer to Array
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-
-  // convert bytes to hex string
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
 }
 
+// get or generate the SHA256 hash of a random 3-digit number
 async function getSHA256Hash() {
-  let cached = retrieve('sha256');
-  if (cached) {
-    return cached;
+  let cachedHash = retrieve('sha256');
+  let cachedPin = retrieve('pin');
+
+  if (cachedHash && cachedPin) {
+    return cachedHash;
   }
 
-  cached = await sha256(getRandomArbitrary(MIN, MAX));
-  store('sha256', cached);
-  return cached;
+  const pin = getRandomArbitrary(MIN, MAX).toString();
+  const hash = await sha256(pin);
+  store('pin', pin);
+  store('sha256', hash);
+  return hash;
 }
 
+// initialize the interface with the hash
 async function main() {
   sha256HashView.innerHTML = 'Calculating...';
   const hash = await getSHA256Hash();
   sha256HashView.innerHTML = hash;
 }
 
+// test the entered pin against the hash
 async function test() {
   const pin = pinInput.value;
 
@@ -70,25 +67,28 @@ async function test() {
     return;
   }
 
-  const sha256HashView = document.getElementById('sha256-hash');
-  const hasedPin = await sha256(pin);
+  const enteredHash = await sha256(pin);
+  const originalHash = retrieve('sha256');
 
-  if (hasedPin === sha256HashView.innerHTML) {
+  if (enteredHash === originalHash) {
     resultView.innerHTML = '🎉 success';
     resultView.classList.add('success');
   } else {
     resultView.innerHTML = '❌ failed';
+    resultView.classList.remove('success');
   }
+
   resultView.classList.remove('hidden');
 }
 
-// ensure pinInput only accepts numbers and is 3 digits long
+// ensure only numeric 3-digit input
 pinInput.addEventListener('input', (e) => {
   const { value } = e.target;
   pinInput.value = value.replace(/\D/g, '').slice(0, 3);
 });
 
-// attach the test function to the button
+// attach check function to the button
 document.getElementById('check').addEventListener('click', test);
 
+// run the main function on load
 main();
